@@ -1,0 +1,15 @@
+{
+    "clip_reward":true,
+    "gamma":0.98,
+    "learning_rate":0.005,
+    "learning_step_thresh":10,
+    "load_trained_model":true,
+    "max_num_epsiodes":100000,
+    "model_dir":"/content/drive/MyDrive/TrainedModels",
+    "num_agents":1,
+    "save_freq":20,
+    "seed":2021,
+    "summary_filename_prefix":"/content/drive/MyDrive/TrainedModels/logs/A2C_",
+    "use_cuda":false,
+    "use_entropy_bonus":true
+}
