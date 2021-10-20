@@ -14,7 +14,6 @@ class ReplayBuffer:
 
     def store_transition(self, state, action, reward, new_state, done):
         index = self.mem_count % self.mem_size
-
         self.state_memory[index] = state
         self.new_state_memory[index] = new_state
         self.action_memory[index] = action

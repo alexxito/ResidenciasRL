@@ -1,6 +1,6 @@
 # ResidenciasRL
 
-Trabajo realizado como proyecto de residencias en el CICESE UT3 en Tepic Nayarit, que consiste en el desarrollo de un modelo de **aprendizaje por refuerzo** en el entorno de [Google research football](https://github.com/google-research/football "Repositorio del entorno"), así como el framework de [OpenAI](https://gym.openai.com/ "Repostorio") para experimentación. 
+Trabajo realizado como proyecto de residencias en el CICESE UT3 en Tepic Nayarit, que consiste en el desarrollo de un modelo de **aprendizaje por refuerzo** en el entorno de [Google research football](https://github.com/google-research/football "Repositorio del entorno"), así como el framework de [OpenAI](https://gym.openai.com/ "Página del proyecto") para experimentación. 
 
 El entrenamiento de estos modelos requiere gran cantidad de recursos computacionales, por lo que se recomienda utilizar instancias en la nube, ya sea Google Cloud, AWS o Azure.
 

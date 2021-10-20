@@ -1,34 +1,44 @@
-import os
 import torch as T
 import torch.nn.functional as F
 import numpy as np
+from torch.utils.tensorboard import SummaryWriter
 from replaybuffer import ReplayBuffer
 from networks import ActorNetwork, ValueNetwork, CriticNetwork
+#import torch.multiprocessing as mp
 
+writer = SummaryWriter('SAC/tmp/sac/SACgoogle_')
 
-class Agent:
-    def __init__(self, alpha=0.0003, beta=0.0003, input_dims=[8], env=None, gamma=0.99, n_actions=2, max_size=1000000,
+class Agent():
+    def __init__(self,alpha=0.0003, beta=0.0003, input_dims=[8], env=None, gamma=0.99, n_actions=2, max_size=1000000,
                  tau=0.005, layer1_size=256, layer2_size=256, batch_size=256, reward_scale=2):
+        super(Agent, self).__init__()
+        
         self.gamma = gamma
         self.tau = tau
-        self.memory = ReplayBuffer(max_size=max_size, input_shape=input_dims, n_actions=n_actions)
+        self.alpha = alpha
+        self.beta = beta
+        #self.id = id
+        #self.actor_name = "Agente " + str(self.id)
+        self.input_dims = input_dims
+        self.env = env
+        self.n_actions = n_actions
+        self.memory = ReplayBuffer(max_size=max_size, input_shape=self.input_dims, n_actions=self.n_actions)
         self.batch_size = batch_size
         self.n_actions = n_actions
-
-        self.actor = ActorNetwork(alpha, input_dims, n_actions=n_actions, name='actor',
-                                  max_action=env.action_space.high)
-        self.critic1 = CriticNetwork(beta, input_dims=input_dims, n_actions=n_actions, name='critic1')
-        self.critic2 = CriticNetwork(beta, input_dims=input_dims, n_actions=n_actions, name='critic2')
-
-        self.value = ValueNetwork(beta, input_dims=input_dims, name='value')
-        self.target_value = ValueNetwork(beta, input_dims=input_dims, name='target_value')
-
         self.scale = reward_scale
+
+        self.actor = ActorNetwork(self.alpha, self.input_dims, n_actions=self.n_actions, name='actor',
+                                  max_action=[1])
+        self.critic1 = CriticNetwork(self.beta, input_dims=self.input_dims, n_actions=self.n_actions, name='critic1')
+        self.critic2 = CriticNetwork(self.beta, input_dims=self.input_dims, n_actions=self.n_actions, name='critic2')
+
+        self.value = ValueNetwork(self.beta, input_dims=self.input_dims, name='value')
+        self.target_value = ValueNetwork(self.beta, input_dims=self.input_dims, name='target_value')
         self.update_network_parameters(tau=1)
 
     def choose_action(self, obs):
         state = T.Tensor([obs]).to(self.actor.device)
-        actions, _ = self.actor.sample_normal(state, reparametize=False)
+        actions, _ = self.actor.sample_categorical(state, reparametize=False)
 
         return actions.cpu().detach().numpy()[0]
 
@@ -58,14 +68,14 @@ class Agent:
         self.critic2.save_checkpoint()
 
     def load(self):
-        print('Caragndo modelos...')
+        print('Cargando modelos...')
         self.actor.load_checkpoint()
         self.value.load_checkpoint()
         self.target_value.load_checkpoint()
         self.critic1.load_checkpoint()
         self.critic2.load_checkpoint()
 
-    def learn(self):
+    def learn(self, step):
         if self.memory.mem_count < self.batch_size:
             return
 
@@ -80,8 +90,11 @@ class Agent:
         value = self.value(state).view(-1)
         value_ = self.target_value(state_).view(-1)
         value_[done] = 0.0
-        actions, log_probs = self.actor.sample_normal(state, reparametize=False)
+        actions, log_probs = self.actor.sample_categorical(state, reparametize=False)
         log_probs = log_probs.view(-1)
+        actions = actions.unsqueeze(1)
+        #print("actions: ",actions.shape)
+        #print("state: ",state.shape)
         q1_new_policy = self.critic1.forward(state, actions)
         q2_new_policy = self.critic2.forward(state, actions)
         critic_value = T.min(q1_new_policy, q2_new_policy)
@@ -90,11 +103,15 @@ class Agent:
         self.value.optimizer.zero_grad()
         value_target = critic_value - log_probs
         value_loss = 0.5 * F.mse_loss(value, value_target)
+        writer.add_scalar(self.value.name+'/value_loss',value_loss, step)
         value_loss.backward(retain_graph=True)
         self.value.optimizer.step()
 
-        actions, log_probs = self.actor.sample_normal(state, reparametize=True)
+        actions, log_probs = self.actor.sample_categorical(state, reparametize=True)
         log_probs = log_probs.view(-1)
+        actions = actions.unsqueeze(1)
+        #print("actions: ",actions.shape)
+        #print("state: ",state.shape)
         q1_new_policy = self.critic1.forward(state, actions)
         q2_new_policy = self.critic2.forward(state, actions)
         critic_value = T.min(q1_new_policy, q2_new_policy)
@@ -102,6 +119,7 @@ class Agent:
 
         actor_loss = log_probs - critic_value
         actor_loss = T.mean(actor_loss)
+        writer.add_scalar(self.actor.name+'/actor_loss', actor_loss, step)
         self.actor.optimizer.zero_grad()
         actor_loss.backward(retain_graph=True)
         self.actor.optimizer.step()
@@ -114,7 +132,7 @@ class Agent:
         critic_loss1 = 0.5 * F.mse_loss(q1_old_policy, q_hat)
         critic_loss2 = 0.5 * F.mse_loss(q2_old_policy, q_hat)
         critic_loss = critic_loss1 + critic_loss2
-
+        writer.add_scalar(self.critic1.name+'/critic_loss',critic_loss,step)
         critic_loss.backward()
         self.critic1.optimizer.step()
         self.critic2.optimizer.step()
